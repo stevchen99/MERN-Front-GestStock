@@ -1,71 +1,76 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { Snowflake, Plus, Flame, Trash2 } from 'lucide-react';
+import { Plus, Minus, Trash2, Snowflake } from 'lucide-react';
 
-export default function FreezerView({ freezerItems = [], refreshFreezerItems }) {
-  const [title, setTitle] = useState('');
-  const [portionsCount, setPortionsCount] = useState(1);
-  const [category, setCategory] = useState('Plats cuisinés');
+export default function FreezerView({ freezerItems = [], refreshFreezerItems, categories = [] }) {
+  const [name, setName] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [category, setCategory] = useState('');
+  const [minThreshold, setMinThreshold] = useState(1);
 
-  const handleAddPortion = async (e) => {
+  // Mettre à jour la catégorie par défaut quand la liste des catégories est disponible
+  useEffect(() => {
+    if (categories.length > 0 && !category) {
+      setCategory(categories[0].name);
+    }
+  }, [categories, category]);
+
+  const handleQuantityChange = async (item, delta) => {
+    const newQuantity = Math.max(0, item.quantity + delta);
+    try {
+      await api.patch(`/freezer/${item._id}/quantity`, { 
+        quantity: newQuantity,
+        delta: delta,
+        action: delta > 0 ? 'increment' : 'decrement'
+      });
+      refreshFreezerItems();
+    } catch (err) {
+      console.error("Erreur de modification de quantité (congélateur) :", err.response?.data || err.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm("Supprimer cet article du congélateur ?")) return;
+    try {
+      await api.delete(`/freezer/${id}`);
+      refreshFreezerItems();
+    } catch (err) {
+      console.error("Erreur de suppression :", err);
+    }
+  };
+
+  const handleAddItem = async (e) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!name.trim()) return;
 
     try {
       await api.post('/freezer', { 
-        title: title.trim(),
-        portionsCount: Number(portionsCount),
-        category: category 
+        name: name.trim(), 
+        quantity: Number(quantity), 
+        category: category || (categories[0]?.name || 'CONGELATEUR'), 
+        minThreshold: Number(minThreshold) 
       });
-      setTitle('');
-      setPortionsCount(1);
+      setName('');
+      setQuantity(1);
       refreshFreezerItems();
     } catch (err) {
-      console.error("Erreur ajout congélateur :", err);
+      console.error("Erreur lors de l'ajout dans le congélateur :", err.response?.data || err.message);
+      const serverMessage = err.response?.data?.message || err.response?.data?.error || err.message;
+      alert(`Erreur lors de l'ajout : ${serverMessage}`);
     }
   };
-
-  const handleConsume = async (id) => {
-    try {
-      await api.patch(`/freezer/${id}/consume`, { count: 1 });
-      refreshFreezerItems();
-    } catch (err) {
-      console.error("Erreur décongélation :", err);
-    }
-  };
-
-const handleDelete = async (id) => {
-  if (!confirm("Voulez-vous vraiment supprimer cet élément ?")) return;
-
-  try {
-    await api.delete(`/freezer/${id}`);
-    refreshFreezerItems();
-  } catch (err) {
-    console.error("Erreur de suppression :", err.response?.data || err.message);
-    alert("Erreur lors de la suppression de l'élément.");
-  }
-};
 
   return (
-    <div id="freezer-section" className="bg-slate-800 rounded-xl p-6 border border-slate-700 mt-8">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2.5 bg-cyan-500/10 text-cyan-400 rounded-lg">
-          <Snowflake className="w-6 h-6" />
-        </div>
+    <div className="space-y-8 mt-8">
+      {/* Formulaire d'ajout */}
+      <form onSubmit={handleAddItem} className="bg-slate-800 p-4 rounded-xl border border-slate-700 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
         <div>
-          <h2 className="text-xl font-bold text-slate-100">Gestion du Congélateur</h2>
-          <p className="text-xs text-slate-400">Suivi des portions cuisinées et congelées</p>
-        </div>
-      </div>
-
-      <form onSubmit={handleAddPortion} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 items-end bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
-        <div>
-          <label className="text-xs text-slate-400 block mb-1">Nom du plat / aliment</label>
+          <label className="text-xs text-slate-400 block mb-1">Article surgelé</label>
           <input 
             type="text" 
-            value={title} 
-            onChange={(e) => setTitle(e.target.value)} 
-            placeholder="Ex: Bolognaise maison" 
+            value={name} 
+            onChange={(e) => setName(e.target.value)} 
+            placeholder="Ex: Filets de Poulet 1kg" 
             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500"
             required
           />
@@ -78,67 +83,103 @@ const handleDelete = async (id) => {
             onChange={(e) => setCategory(e.target.value)}
             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500"
           >
-            <option value="Plats cuisinés">Plats cuisinés</option>
-            <option value="Viandes & Poissons">Viandes & Poissons</option>
-            <option value="Légumes">Légumes</option>
-            <option value="Desserts & Pains">Desserts & Pains</option>
+            {categories.length === 0 ? (
+              <option value="VIANDES">VIANDES</option>
+            ) : (
+              categories.map((cat) => (
+                <option key={cat._id || cat.id || cat.name} value={cat.name}>
+                  {cat.name}
+                </option>
+              ))
+            )}
           </select>
         </div>
 
         <div>
-          <label className="text-xs text-slate-400 block mb-1">Nombre de portions</label>
+          <label className="text-xs text-slate-400 block mb-1">Quantité initiale</label>
           <input 
             type="number" 
-            value={portionsCount} 
-            onChange={(e) => setPortionsCount(e.target.value)} 
-            min="1"
+            value={quantity} 
+            onChange={(e) => setQuantity(e.target.value)} 
+            min="0"
+            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs text-slate-400 block mb-1">Seuil d'alerte</label>
+          <input 
+            type="number" 
+            value={minThreshold} 
+            onChange={(e) => setMinThreshold(e.target.value)} 
+            min="0"
             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500"
           />
         </div>
 
         <button type="submit" className="bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 text-sm transition cursor-pointer">
-          <Plus className="w-4 h-4" /> Congeler
+          <Plus className="w-4 h-4" /> Ajouter
         </button>
       </form>
 
-      {freezerItems.length === 0 ? (
-        <p className="text-slate-400 text-sm py-4 text-center">Le congélateur est vide.</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {freezerItems.map((item) => {
-            const itemId = item._id || item.id;
-            return (
-              <div key={itemId} className="bg-slate-900 p-4 rounded-lg border border-slate-700/80 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-slate-200">{item.title || item.dishName || item.name}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-medium">
-                      {item.portionsCount ?? item.count ?? item.quantity} portion(s)
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mb-4">{item.category}</p>
-                </div>
-
-                <div className="flex justify-between items-center pt-2 border-t border-slate-800">
-                  <button 
-                    onClick={() => handleConsume(itemId)}
-                    className="text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-2.5 py-1.5 rounded-md font-medium flex items-center gap-1 transition cursor-pointer"
-                  >
-                    <Flame className="w-3.5 h-3.5" /> Décongeler (-1)
-                  </button>
-                  
-                  <button 
-                    onClick={() => handleDelete(itemId)}
-                    className="p-1.5 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 rounded-md transition cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+      {/* Tableau des articles du congélateur */}
+      <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div className="p-4 bg-slate-900/40 border-b border-slate-700 flex items-center gap-2 text-cyan-400 font-semibold text-sm">
+          <Snowflake className="w-4 h-4" />
+          <span>Inventaire Congélateur</span>
         </div>
-      )}
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-900/50 text-slate-400 text-xs uppercase border-b border-slate-700">
+              <th className="p-4">Article</th>
+              <th className="p-4">Catégorie</th>
+              <th className="p-4">Quantité</th>
+              <th className="p-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-700 text-sm">
+            {freezerItems.length === 0 ? (
+              <tr>
+                <td colSpan="4" className="p-6 text-center text-slate-400">Aucun produit dans le congélateur.</td>
+              </tr>
+            ) : (
+              freezerItems.map((item) => (
+                <tr key={item._id} className="hover:bg-slate-700/30">
+                  <td className="p-4 font-medium">{item.name}</td>
+                  <td className="p-4 text-slate-400">{item.category}</td>
+                  <td className="p-4">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                      item.quantity <= (item.minThreshold || 1) ? 'bg-amber-500/20 text-amber-300' : 'bg-cyan-500/20 text-cyan-300'
+                    }`}>
+                      {item.quantity}
+                    </span>
+                  </td>
+                  <td className="p-4 flex justify-end items-center gap-2">
+                    <button 
+                      onClick={() => handleQuantityChange(item, -1)}
+                      className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-200 cursor-pointer"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleQuantityChange(item, 1)}
+                      className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-200 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(item._id)}
+                      className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg ml-2 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

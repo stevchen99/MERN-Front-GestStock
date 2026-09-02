@@ -1,12 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { Plus, Minus, Trash2 } from 'lucide-react';
 
-export default function StockList({ items, refreshItems }) {
+export default function StockList({ items = [], refreshItems, categories = [] }) {
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [category, setCategory] = useState('EPICERIE');
+  const [category, setCategory] = useState('');
   const [minThreshold, setMinThreshold] = useState(2);
+
+  // Mettre à jour la catégorie par défaut quand la liste des catégories est chargée
+  useEffect(() => {
+    if (categories.length > 0 && !category) {
+      setCategory(categories[0].name);
+    }
+  }, [categories, category]);
 
   const handleQuantityChange = async (item, delta) => {
     const newQuantity = Math.max(0, item.quantity + delta);
@@ -40,7 +47,7 @@ export default function StockList({ items, refreshItems }) {
       await api.post('/items', { 
         name: name.trim(), 
         quantity: Number(quantity), 
-        category, 
+        category: category || (categories[0]?.name || 'EPICERIE'), 
         minThreshold: Number(minThreshold) 
       });
       setName('');
@@ -75,11 +82,15 @@ export default function StockList({ items, refreshItems }) {
             onChange={(e) => setCategory(e.target.value)}
             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
           >
-            <option value="EPICERIE">Épicerie</option>
-            <option value="FRAIS">Frais</option>
-            <option value="BOISSONS">Boissons</option>
-            <option value="ENTRETIEN">Entretien</option>
-            <option value="PETIT_DEJEUNER">Petit Déjeuner</option>
+            {categories.length === 0 ? (
+              <option value="EPICERIE">EPICERIE</option>
+            ) : (
+              categories.map((cat) => (
+                <option key={cat._id || cat.id || cat.name} value={cat.name}>
+                  {cat.name}
+                </option>
+              ))
+            )}
           </select>
         </div>
 
