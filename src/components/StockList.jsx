@@ -1,67 +1,27 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { Plus, Minus, Pencil, Trash2 } from 'lucide-react';
+import { formatDate } from '../utils/formatters';
+import { Plus, Minus, Trash2, Package } from 'lucide-react';
 
-export default function StockList({ items = [], refreshItems, categories = [], suppliers = [] }) {
+export default function StockList({ 
+  items = [], 
+  refreshItems, 
+  categories = [], 
+  suppliers = [] 
+}) {
   const [name, setName] = useState('');
-  const [quantity, setQuantity] = useState(1);
   const [category, setCategory] = useState('');
   const [supplier, setSupplier] = useState('');
-  const [minThreshold, setMinThreshold] = useState(2);
+  const [quantity, setQuantity] = useState(1);
+  const [unit, setUnit] = useState('unité');
+  const [minQuantity, setMinQuantity] = useState(2);
 
+  // Synchronise la catégorie par défaut avec la première disponible
   useEffect(() => {
     if (categories.length > 0 && !category) {
       setCategory(categories[0].name);
     }
   }, [categories, category]);
-
-  const handleQuantityChange = async (item, delta) => {
-    const newQuantity = Math.max(0, item.quantity + delta);
-    try {
-      await api.patch(`/items/${item._id}/quantity`, { 
-        quantity: newQuantity,
-        delta: delta,
-        action: delta > 0 ? 'increment' : 'decrement'
-      });
-      refreshItems();
-    } catch (err) {
-      console.error("Erreur de modification de quantité :", err.response?.data || err.message);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!confirm("Supprimer cet article ?")) return;
-    try {
-      await api.delete(`/items/${id}`);
-      refreshItems();
-    } catch (err) {
-      console.error("Erreur de suppression :", err);
-    }
-  };
-
-  const handleEdit = async (item) => {
-    const editedName = prompt('Nom du produit', item.name);
-    if (editedName === null || !editedName.trim()) return;
-
-    const editedQuantity = prompt('Quantité', item.quantity);
-    const editedMinQuantity = prompt('Seuil d\'alerte', item.minQuantity ?? 1);
-    if (editedQuantity === null || editedMinQuantity === null) return;
-
-    const nextQuantity = Number(editedQuantity);
-    const nextMinQuantity = Number(editedMinQuantity);
-    if (!Number.isFinite(nextQuantity) || nextQuantity < 0 || !Number.isFinite(nextMinQuantity) || nextMinQuantity < 0) return;
-
-    try {
-      await api.put(`/items/${item._id}`, {
-        name: editedName.trim(),
-        quantity: nextQuantity,
-        minQuantity: nextMinQuantity
-      });
-      refreshItems();
-    } catch (err) {
-      console.error("Erreur de modification :", err.response?.data || err.message);
-    }
-  };
 
   const handleAddItem = async (e) => {
     e.preventDefault();
@@ -70,24 +30,54 @@ export default function StockList({ items = [], refreshItems, categories = [], s
     try {
       await api.post('/items', { 
         name: name.trim(), 
-        quantity: Number(quantity), 
-        category: category || (categories[0]?.name || 'EPICERIE'), 
+        category: category || (categories[0]?.name || 'EPICERIE_SECHE'), 
         supplier,
-        minQuantity: Number(minThreshold)
+        quantity: Number(quantity),
+        unit,
+        minQuantity: Number(minQuantity)
       });
+
+      // Réinitialisation du formulaire
       setName('');
-      setQuantity(1);
       setSupplier('');
+      setQuantity(1);
+      setUnit('unité');
+      setMinQuantity(2);
+      
       refreshItems();
     } catch (err) {
       console.error("Erreur lors de l'ajout :", err.response?.data || err.message);
+      alert(`Erreur : ${err.response?.data?.message || err.message}`);
+    }
+  };
+
+  const handleQuantityChange = async (item, delta) => {
+    const newQuantity = Math.max(0, item.quantity + delta);
+    try {
+      await api.patch(`/items/${item._id}/quantity`, { 
+        quantity: newQuantity 
+      });
+      refreshItems();
+    } catch (err) {
+      console.error("Erreur de modification de quantité :", err.response?.data || err.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm("Voulez-vous vraiment supprimer cet article ?")) return;
+    try {
+      await api.delete(`/items/${id}`);
+      refreshItems();
+    } catch (err) {
+      console.error("Erreur de suppression :", err);
     }
   };
 
   return (
     <div className="space-y-8 mt-8">
+      {/* Formulaire de création */}
       <form onSubmit={handleAddItem} className="bg-slate-800 p-4 rounded-xl border border-slate-700 grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-        <div>
+        <div className="md:col-span-2">
           <label className="text-xs text-slate-400 block mb-1">Nom du produit</label>
           <input 
             type="text" 
@@ -138,21 +128,22 @@ export default function StockList({ items = [], refreshItems, categories = [], s
         </div>
 
         <div>
-          <label className="text-xs text-slate-400 block mb-1">Seuil d'alerte</label>
+          <label className="text-xs text-slate-400 block mb-1">Seuil critique</label>
           <input 
             type="number" 
-            value={minThreshold} 
-            onChange={(e) => setMinThreshold(e.target.value)} 
+            value={minQuantity} 
+            onChange={(e) => setMinQuantity(e.target.value)} 
             min="0"
             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
           />
         </div>
 
-        <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 text-sm transition cursor-pointer">
-          <Plus className="w-4 h-4" /> Ajouter
+        <button type="submit" className="md:col-span-6 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 text-sm transition cursor-pointer">
+          <Plus className="w-4 h-4" /> Ajouter le produit
         </button>
       </form>
 
+      {/* Tableau d'affichage des stocks */}
       <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -161,38 +152,64 @@ export default function StockList({ items = [], refreshItems, categories = [], s
               <th className="p-4">Catégorie</th>
               <th className="p-4">Fournisseur</th>
               <th className="p-4">Quantité</th>
+              <th className="p-4">Ajouté le</th>
               <th className="p-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700 text-sm">
-            {items.map((item) => (
-              <tr key={item._id} className="hover:bg-slate-700/30">
-                <td className="p-4 font-medium">{item.name}</td>
-                <td className="p-4 text-slate-400">{item.category}</td>
-                <td className="p-4 text-slate-400">{item.supplier || '-'}</td>
-                <td className="p-4">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                    item.quantity <= (item.minQuantity ?? 1) ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'
-                  }`}>
-                    {item.quantity}
-                  </span>
-                </td>
-                <td className="p-4 flex justify-end items-center gap-2">
-                  <button onClick={() => handleEdit(item)} className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-200" title="Modifier">
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => handleQuantityChange(item, -1)} className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-200">
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => handleQuantityChange(item, 1)} className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-200">
-                    <Plus className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => handleDelete(item._id)} className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg ml-2">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+            {items.length === 0 ? (
+              <tr>
+                <td colSpan="6" className="p-4 text-center text-slate-400">
+                  Aucun produit en stock.
                 </td>
               </tr>
-            ))}
+            ) : (
+              items.map((item) => (
+                <tr key={item._id} className="hover:bg-slate-700/30">
+                  <td className="p-4 font-medium text-slate-200 flex items-center gap-2">
+                    <Package className="w-4 h-4 text-emerald-400" />
+                    {item.name}
+                  </td>
+                  <td className="p-4 text-slate-400">{item.category}</td>
+                  <td className="p-4 text-slate-400">{item.supplier || '-'}</td>
+                  <td className="p-4">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                      item.quantity <= (item.minQuantity ?? 2) 
+                        ? 'bg-amber-500/20 text-amber-300' 
+                        : 'bg-emerald-500/20 text-emerald-300'
+                    }`}>
+                      {item.quantity} {item.unit || ''}
+                    </span>
+                  </td>
+                  <td className="p-4 text-slate-400 text-xs">
+                    {formatDate(item.createdAt, true)}
+                  </td>
+                  <td className="p-4 flex justify-end items-center gap-2">
+                    <button 
+                      onClick={() => handleQuantityChange(item, -1)} 
+                      className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-200 cursor-pointer"
+                      title="Diminuer"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleQuantityChange(item, 1)} 
+                      className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-200 cursor-pointer"
+                      title="Augmenter"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(item._id)} 
+                      className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg ml-2 cursor-pointer"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

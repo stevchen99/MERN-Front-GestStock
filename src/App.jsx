@@ -4,7 +4,8 @@ import StockList from './components/StockList';
 import FreezerView from './components/FreezerView';
 import StatsOverview from './components/StatsOverview';
 import SettingsView from './components/SettingsView';
-import { LayoutDashboard, Snowflake, Settings } from 'lucide-react';
+import { LayoutDashboard, Snowflake, Settings, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'freezer', 'settings'
@@ -48,6 +49,43 @@ export default function App() {
 
   const lowStockItems = items.filter(item => item.quantity <= (item.minQuantity ?? 1));
 
+  const exportToExcel = () => {
+    const stockRows = items.map((item) => ({
+      Produit: item.name,
+      Catégorie: item.category,
+      Fournisseur: item.supplier || '',
+      Quantité: item.quantity,
+      'Seuil minimum': item.minQuantity ?? 1,
+      'Ajouté le': item.createdAt ? new Date(item.createdAt).toLocaleString('fr-FR') : ''
+    }));
+
+    const freezerRows = freezerItems.map((item) => ({
+      Produit: item.title,
+      Catégorie: item.location || item.category || '',
+      Fournisseur: item.supplier || '',
+      'Nombre de portions': item.portionsCount,
+      Péremption: item.expirationDate ? new Date(item.expirationDate).toLocaleDateString('fr-FR') : '',
+      'Ajouté le': item.createdAt ? new Date(item.createdAt).toLocaleString('fr-FR') : ''
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    const stockSheet = XLSX.utils.json_to_sheet(stockRows);
+    const freezerSheet = XLSX.utils.json_to_sheet(freezerRows);
+
+    stockSheet['!cols'] = [
+      { wch: 24 }, { wch: 20 }, { wch: 20 }, { wch: 12 },
+      { wch: 16 }, { wch: 22 }
+    ];
+    freezerSheet['!cols'] = [
+      { wch: 24 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
+      { wch: 16 }, { wch: 22 }
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, stockSheet, 'Stock');
+    XLSX.utils.book_append_sheet(workbook, freezerSheet, 'Congelateur');
+    XLSX.writeFile(workbook, `geststock-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-6">
       {/* En-tête avec Navigation par Onglets */}
@@ -57,8 +95,9 @@ export default function App() {
           <p className="text-slate-400 text-sm">Vue d'ensemble des stocks et congélateur</p>
         </div>
 
-        {/* Boutons d'Onglets */}
-        <nav className="flex bg-slate-800 p-1 rounded-xl border border-slate-700/80 gap-1">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Boutons d'Onglets */}
+          <nav className="flex bg-slate-800 p-1 rounded-xl border border-slate-700/80 gap-1">
           <button 
             onClick={() => setActiveTab('dashboard')} 
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition ${activeTab === 'dashboard' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
@@ -79,7 +118,16 @@ export default function App() {
           >
             <Settings className="w-4 h-4" /> Paramètres
           </button>
-        </nav>
+          </nav>
+          <button
+            onClick={exportToExcel}
+            className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white transition"
+            title="Exporter le stock et le congélateur en Excel"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Exporter Excel
+          </button>
+        </div>
       </header>
 
       {/* Cartes de statistiques */}
