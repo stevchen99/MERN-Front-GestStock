@@ -1,122 +1,88 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useEffect, useState } from 'react';
+import api from './api/axios';
+import StockList from './components/StockList';
+import FreezerView from './components/FreezerView';
+import StatsOverview from './components/StatsOverview';
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [items, setItems] = useState([]);
+  const [freezerItems, setFreezerItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Récupération des produits du stock principal
+  const fetchItems = () => {
+    api.get('/items')
+      .then((res) => {
+        setItems(res.data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Erreur lors de la récupération des stocks:", err);
+        setLoading(false);
+      });
+  };
+
+  // Récupération des produits du congélateur
+  const fetchFreezerItems = () => {
+    api.get('/freezer')
+      .then((res) => {
+        setFreezerItems(res.data);
+      })
+      .catch((err) => {
+        console.error("Erreur chargement congélateur :", err);
+      });
+  };
+
+  useEffect(() => {
+    fetchItems();
+    fetchFreezerItems();
+  }, []);
+
+  const lowStockItems = items.filter(item => item.quantity <= (item.minThreshold || 2));
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-6">
+      <header className="mb-8 border-b border-slate-800 pb-4 flex justify-between items-center">
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+          <h1 className="text-2xl font-bold text-emerald-400">Gîte Stock Management</h1>
+          <p className="text-slate-400 text-sm">Vue d'ensemble des stocks et congélateur</p>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
+      </header>
+
+      {/* Reçoit freezerItems directement */}
+      <StatsOverview items={items} freezerItems={freezerItems} />
+
+      <section className="bg-slate-800 rounded-xl p-6 border border-slate-700 mb-8">
+        <h2 className="text-lg font-semibold mb-4 text-slate-200">Produits sous le seuil critique</h2>
+        {loading ? (
+          <p className="text-slate-400 text-sm">Chargement des données...</p>
+        ) : lowStockItems.length === 0 ? (
+          <p className="text-slate-400 text-sm">Aucun produit en alerte de stock.</p>
+        ) : (
+          <div className="divide-y divide-slate-700">
+            {lowStockItems.map((item) => (
+              <div key={item._id} className="py-3 flex justify-between items-center">
+                <div>
+                  <p className="font-medium text-slate-200">{item.name}</p>
+                  <p className="text-xs text-slate-400">{item.category}</p>
+                </div>
+                <span className="bg-amber-500/20 text-amber-300 text-xs px-2.5 py-1 rounded-full font-semibold">
+                  Reste : {item.quantity}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
+      <section id="add-form" className="mb-8">
+        <StockList items={items} refreshItems={fetchItems} />
       </section>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <section>
+        {/* Reçoit les items et la fonction de rafraîchissement */}
+        <FreezerView freezerItems={freezerItems} refreshFreezerItems={fetchFreezerItems} />
+      </section>
+    </div>
+  );
 }
-
-export default App
