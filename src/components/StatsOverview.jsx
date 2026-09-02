@@ -3,7 +3,7 @@ import { Package, AlertTriangle, Snowflake } from 'lucide-react';
 export default function StatsOverview({ items = [], freezerItems = [] }) {
   const totalItems = items.length;
   const lowStockAlerts = items.filter(
-    (item) => item.quantity <= (item.minThreshold || 2)
+    (item) => item.quantity <= (item.minQuantity ?? 1)
   ).length;
 
   const totalFreezerPortions = freezerItems.reduce(

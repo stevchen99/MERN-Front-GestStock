@@ -4,13 +4,14 @@ import StockList from './components/StockList';
 import FreezerView from './components/FreezerView';
 import StatsOverview from './components/StatsOverview';
 import SettingsView from './components/SettingsView';
-import { LayoutDashboard, Snowflake, Settings, Package } from 'lucide-react';
+import { LayoutDashboard, Snowflake, Settings } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'freezer', 'settings'
   const [items, setItems] = useState([]);
   const [freezerItems, setFreezerItems] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchItems = () => {
@@ -32,13 +33,20 @@ export default function App() {
       .catch((err) => console.error(err));
   };
 
+  const fetchSuppliers = () => {
+    api.get('/suppliers')
+      .then((res) => setSuppliers(res.data))
+      .catch((err) => console.error(err));
+  };
+
   useEffect(() => {
     fetchItems();
     fetchFreezerItems();
     fetchCategories();
+    fetchSuppliers();
   }, []);
 
-  const lowStockItems = items.filter(item => item.quantity <= (item.minThreshold || 2));
+  const lowStockItems = items.filter(item => item.quantity <= (item.minQuantity ?? 1));
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-6">
@@ -74,7 +82,7 @@ export default function App() {
         </nav>
       </header>
 
-      {/* Cartes de statistiques toujours visibles ou selon l'onglet */}
+      {/* Cartes de statistiques */}
       <StatsOverview items={items} freezerItems={freezerItems} />
 
       {/* VUE : TABLEAU DE BORD */}
@@ -92,7 +100,9 @@ export default function App() {
                   <div key={item._id} className="py-3 flex justify-between items-center">
                     <div>
                       <p className="font-medium text-slate-200">{item.name}</p>
-                      <p className="text-xs text-slate-400">{item.category}</p>
+                      <p className="text-xs text-slate-400">
+                        {item.category} {item.supplier ? `• ${item.supplier}` : ''}
+                      </p>
                     </div>
                     <span className="bg-amber-500/20 text-amber-300 text-xs px-2.5 py-1 rounded-full font-semibold">
                       Reste : {item.quantity}
@@ -103,7 +113,12 @@ export default function App() {
             )}
           </section>
 
-          <StockList items={items} refreshItems={fetchItems} categories={categories} />
+          <StockList 
+            items={items} 
+            refreshItems={fetchItems} 
+            categories={categories} 
+            suppliers={suppliers} 
+          />
         </div>
       )}
 
@@ -113,6 +128,7 @@ export default function App() {
           freezerItems={freezerItems} 
           refreshFreezerItems={fetchFreezerItems} 
           categories={categories.filter(c => c.type === 'freezer' || c.type === 'both')} 
+          suppliers={suppliers} 
         />
       )}
 
